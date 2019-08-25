@@ -19,8 +19,9 @@ The requirements of the assignment is as follows:-
 14. **dirty** command will print the size of the part of memory which is dirty.  
 15. Also the **history** commands need to be supported which shows the last few commands which the user entered. 
 .![promp](https://github.com/kanishk779/Assignment1_CSE_SHELL/blob/master/Resources/History.png)   
-16. The user can also specify the number of commands to show in history as an argument.  
-17. To exit the shell program type the command **exit**.
+16. The user can also specify the number of commands to show in history as an argument.
+17. Multiple commands can be given at once separated by semi-colon. 
+18. To exit the shell program type the command **exit**.
 
 ## How to run the Shell
 
@@ -38,12 +39,16 @@ $ make
 
 #build run the shell 
 $ ./output
+
+#for doing the cleanup
+$ make clean
 ```
 
 ## NOTE
 
 1. The **pinfo** will not work for mac Operating system because the /proc directory does not exist.
 2. Similarly the **nightswatch** command will not work for the mac Operating system.
+3. Till now the i have not added support for handling the pipes.
 
 
  
