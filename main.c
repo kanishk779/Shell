@@ -88,6 +88,25 @@ void fill_Queue(char * str)
        	used[rear] = 1; 
     }
 }
+char * get_kth_command(int k)
+{
+	int count = 1;
+	int rear_temp = rear;
+	while(rear_temp != front)
+	{
+		if(count == k)
+		{
+			return arr[rear_temp];
+		}
+		else
+		{
+			rear_temp = (rear_temp - 1 + QUEUE_SIZE)%QUEUE_SIZE;
+			count++;
+		}
+	}
+	printf("User has not given that many commands till now\n");
+	return NULL;
+}
 int main()
 {
 	// initialise shell and its variables
@@ -99,9 +118,9 @@ int main()
 	{
 		show_user_sys_name();
 		line = m_shell_read_line();
-		fill_Queue(line);
 		int len = strlen(line);
 		line[len-1]='\0';
+		fill_Queue(line);
 		parse_commands(line);
 		free(line);
 	}
@@ -248,8 +267,47 @@ char ** fill_argument_array(int words)
 	options[index]=NULL;
 	return options;
 }
+int parse_up_command(char* command)
+{
+	int len = strlen(command);
+	int is_up_arrow = true;
+	int up_count = 0;
+	for(int i=0;i<len;i++)
+	{
+		if (command[i] == '\033') { // if the first value is esc
+	    i+=2; // skip the [
+	    switch(command[i]) { // the real value
+	        case 'A':
+	        	up_count++;
+	            break;
+	        case 'B':
+	        	is_up_arrow = false;
+	            break;
+	        case 'C':
+	        	is_up_arrow = false;
+	            break;
+	        case 'D':
+	        	is_up_arrow = false;
+	            break;
+	    	}
+		}
+		else
+		{
+			is_up_arrow = false;
+			break;
+		}
+	}
+	if(!is_up_arrow)
+		return 0;
+	char * kth_command = get_kth_command(up_count+1);
+	parse_individual_command(kth_command);
+	return 1;
+}
 int parse_individual_command(char* command)
 {
+	// The function will only if up command is given
+	if(parse_up_command(command))
+		return 0;
 	int words = count_of_words_in_str(command);
 	char * echo_helper = (char *) malloc(512);
 	strcpy(echo_helper,command);
