@@ -156,6 +156,9 @@ void init_shell()
 	builtins[7] = "pinfo";
 	builtins[8] = "nightswatch";
 	builtins[9] = "pwd";
+	builtins[10]= "setenv";
+	builtins[11]= "unsetenv";
+	//builtins[12]= "showlist";
 
 	printf("------------------------This is shell inside shell ----------------\n");
 }
@@ -504,7 +507,12 @@ void call_appropriate_function(int builtin_index,char ** options_array,int numbe
 					printf("Error in getting the curr_directory\n");
 				break;
 			}
-			
+		case 10:
+			m_setenv(options_array,number_of_arguments);
+			break;
+		case 11:
+			m_unsetenv(options_array,number_of_arguments);
+			break;
 		default:
 			perror("Are you sane??\n");
 	}

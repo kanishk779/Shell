@@ -486,13 +486,61 @@ void display_Queue(int how_many)
     } 
 }
 
+int m_setenv(char ** arguments,int number_of_args)
+{
+	if(number_of_args == 0)
+	{
+		printf("The variable name and value needs to be given\n");
+		return 0;
+	}
+	else if(number_of_args >= 3)
+	{
+		printf("Too many arguments only variable name and value needs to be given\n");
+		return 0;
+	}
+	else if(number_of_args == 2)
+	{
+		setenv(arguments[0],arguments[1],1);
+	}
+	return 0;
+}
+
+int m_unsetenv(char ** arguments,int number_of_args)
+{
+	if(number_of_args == 0)
+	{
+		printf("You must tell which variable to unset\n");
+		return 0;
+	}
+	else if(number_of_args > 1)
+	{
+		printf("You must only give one argument\n");
+		return 0;
+	}
+	else
+	{
+		unsetenv(arguments[0]);
+	}
+	return 0;
+}
 void history(int how_many)
 {
 	count = how_many;
 	display_Queue(count);
+	count = 10;
 }
 int m_echo(char* user_msg)
 {
+	if(user_msg[0] == '$')
+	{
+		int len = strlen(user_msg);
+		char * new_str = (char *)malloc(len);
+		for(int i=1;i<len;i++)
+			new_str[i-1] = user_msg[i];
+		char * value = getenv(new_str);
+		printf("%s\n",value);
+		return 0;
+	}
 	printf("%s\n", user_msg);
 	return 0;
 }
