@@ -8,9 +8,6 @@ char *builtins[NO_OF_BUILTIN];
 int rear,front,size;
 char **arr;
 int used[QUEUE_SIZE];
-pid_t foreground_p;
-int loop_Stop;
-//pid_t background_processes_pid[100];
 void handler()
 {
 	int status;
@@ -149,7 +146,7 @@ void init_shell()
 	builtins[0] = "ls";
 	builtins[1] = "cd";
 	builtins[2] = "echo";
-	builtins[3] = "exit";
+	builtins[3] = "quit";
 	builtins[4] = "history";
 	builtins[5] = "help";
 	builtins[6] = "clear";
@@ -158,7 +155,6 @@ void init_shell()
 	builtins[9] = "pwd";
 	builtins[10]= "setenv";
 	builtins[11]= "unsetenv";
-	//builtins[12]= "showlist";
 
 	printf("------------------------This is shell inside shell ----------------\n");
 }
@@ -168,7 +164,10 @@ char * m_shell_read_line()
 {
 	char *line = NULL;
 	size_t buffer_size = 0;
-	getline(&line,&buffer_size,stdin);
+	if (getline(&line,&buffer_size,stdin) < 0) {
+		perror("getline");
+		exit(1);
+	}
 	return line;
 }
 void show_user_sys_name()
@@ -214,15 +213,24 @@ int count_of_words_in_str(char * str)
 	int len = strlen(str);
 	char prev = str[0];
 	int words = 0;
-	if(str[len-1] != ' ')
-		words++;
 	for(int i=1;i<len;i++)
 	{
 		if(prev!=' ' && str[i]==' ')
 			words++;
+		prev = str[i];
 	}
+	if(str[len-1] != ' ')
+		words++;
 	return words;
 }
+struct command_structure
+{
+    char **argv;
+    char * input_file;
+    char * output_file;
+    int variant;
+};
+
 void parse_commands(char* commands)
 {
 	int num_commands = number_of_commands_separated_by_semicolon(commands);
@@ -250,6 +258,138 @@ void parse_commands(char* commands)
 		parsed_com++;
 	}
 	free(commands_array);
+}
+int spawn_proc (int in, int out, struct command_structure *cmd) {
+	// 5 cases can occur
+	// case 0 -> no redirection is present
+	// case 1 -> cmd < input
+	// case 2 -> cmd arguments > somefile
+	// case 3 -> cmd < input > somefile
+	// case 4 -> cmd arguments >> somefile
+	// case 5 -> cmd < input >> somefile
+    pid_t pid;
+    if ((pid = fork ()) == 0) {
+    	
+        if (in != 0) {
+            dup2 (in, 0);
+            close (in);
+        }
+        if (out != 1) {
+            dup2 (out, 1);
+            close (out);
+        }
+        
+        switch(cmd->variant)
+        {
+        	case 0:
+        	{
+        		int return_code = execvp(cmd->argv [0], (char **)cmd->argv);
+		        if (return_code < 0) {
+		            perror("execvp failed");
+		            exit(1);
+		        }
+        		break;
+        	}
+        	case 1:
+        	{
+        		int input_fd = open(cmd->input_file,O_RDONLY,0);
+        		dup2(input_fd,0);
+        		int return_code = execvp(cmd->argv [0], (char **)cmd->argv);
+		        if (return_code < 0) {
+		            perror("execvp failed");
+		            exit(1);
+		        }
+		        close(input_fd);
+        		break;
+        	}
+        	case 2:
+        	{
+        		int output_fd = open(cmd->output_file, O_RDWR | O_CREAT, 0644);
+        		dup2(output_fd,1);
+        		int return_code = execvp(cmd->argv [0], (char **)cmd->argv);
+		        if (return_code < 0) {
+		            perror("execvp failed");
+		            exit(1);
+		        }
+		        close(output_fd);
+        		break;
+        	}
+        	case 3:
+        	{
+        		int input_fd = open(cmd->input_file,O_RDONLY,0);
+        		int output_fd = open(cmd->output_file, O_WRONLY | O_CREAT, 0644);
+        		dup2(input_fd,0);
+        		dup2(output_fd,1);
+        		int return_code = execvp(cmd->argv [0], (char **)cmd->argv);
+		        if (return_code < 0) {
+		            perror("execvp failed");
+		            exit(1);
+		        }
+        		close(input_fd);
+        		close(output_fd);
+        		break;
+        	}
+        	case 4:
+        	{
+        		int output_fd = open(cmd->output_file, O_RDWR | O_APPEND | O_CREAT, 0644);
+        		dup2(output_fd,1);
+        		int return_code = execvp(cmd->argv [0], (char **)cmd->argv);
+		        if (return_code < 0) {
+		            perror("execvp failed");
+		            exit(1);
+		        }
+		        close(output_fd);
+        		break;
+        	}
+        	case 5:
+        	{
+        		int input_fd = open(cmd->input_file,O_RDONLY,0);
+        		int output_fd = open(cmd->output_file, O_WRONLY | O_CREAT, 0644);
+        		dup2(input_fd,0);
+        		dup2(output_fd,1);
+        		int return_code = execvp(cmd->argv [0], (char **)cmd->argv);
+		        if (return_code < 0) {
+		            perror("execvp failed");
+		            exit(1);
+		        }
+        		close(input_fd);
+        		close(output_fd);
+        		break;
+        	}
+        }
+
+    } else if (pid < 0) {
+        perror("fork failed");
+        exit(1);
+    }
+    else
+    {
+    	int status;
+    	waitpid(pid,&status,0);
+    }
+    return pid;
+}
+/* Helper function that forks pipes */
+/*
+This function will be called if there are pipes or 
+redirection in the command given the by the user.
+*/
+int fork_pipes (int n, struct command_structure **cmd) {
+    int i;
+    int in, fd [2];
+    in = 0;
+    for (i = 0; i < n; ++i) {
+        pipe (fd);
+    	spawn_proc(in,fd[1],cmd[i]);
+        close (fd [1]);
+        in = fd [0];
+    }
+    if(in != 0)
+    	dup2 (in, 0);
+    spawn_proc(in,1,cmd[i]);
+    int status;
+    waitpid(-1,&status,0);
+    return 0;
 }
 /*
 strtok() will remember which string it operated on last time even if a function 
@@ -306,11 +446,131 @@ int parse_up_command(char* command)
 	parse_individual_command(kth_command);
 	return 1;
 }
+int give_count_of_pipes(char * command)
+{
+	int count = 0;
+	int len = strlen(command);
+	for(int i=0;i<len;i++)
+	{
+		if(command[i] == '|')
+			count++;
+	}
+	return count;
+}
+int determine_case(char * command)
+{
+	int len = strlen(command);
+	int left_found = false;
+	int right_found = false;
+	int right_append_found = false;
+	for(int i=0;i<len;i++)
+	{
+		if(command[i] == '<')
+			left_found = true;
+		if(command[i] == '>' && (i+1)<len && command[i+1]!='>')
+			right_found = true;
+		if(command[i] == '>' && (i+1)<len && command[i+1]=='>')
+			right_append_found = true;
+	}
+	if(left_found && right_append_found)
+		return 5;
+	if(right_append_found)
+		return 4;
+	if(left_found && right_found)
+		return 3;
+	if(left_found)
+		return 1;
+	if(right_found)
+		return 2; 
+		
+	return 0;
+}
+
+int stringToInt(char * str)
+{
+	int len = strlen(str);
+	int result = 0;
+	for(int i=0;i<len;i++)
+	{
+		result = result*10 + (str[i] - '0');
+	}
+	return result;
+}
 int parse_individual_command(char* command)
 {
-	// The function will only if up command is given
+	// The function will only work if up command is given
 	if(parse_up_command(command))
 		return 0;
+	int pipe_count = give_count_of_pipes(command);
+	if(pipe_count >= 1)
+	{
+		//separate on the basis of Pipe
+		char ** arr = (char **)malloc((pipe_count+1)*sizeof(char *));
+		char * separate = strtok(command,PIPE_DELIM);
+		int idx = 0;
+		while(separate != NULL)
+		{
+			int len = strlen(separate);
+			arr[idx] = (char *)malloc(len+1);
+			arr[idx] = separate;
+			separate = strtok(NULL,PIPE_DELIM);
+			idx++;
+		}
+		struct command_structure ** cmd;
+		cmd = (struct command_structure **)malloc((pipe_count+1)*sizeof(struct command_structure *));
+	  	for(int i=0;i<=pipe_count;i++)
+	  	{
+	  		// first tokenize the string;
+	  		int var = determine_case(arr[i]);
+	  		int words = count_of_words_in_str(arr[i]);
+	  		char ** words_arr = (char **) malloc((words) * sizeof(char*));
+	  		char * separate = strtok(arr[i],MAIN_TOK_DELIM);
+	  		int idx = 0;
+	  		while(separate != NULL)
+	  		{
+	  			int len = strlen(separate);
+	  			words_arr[idx] = (char * )malloc(len+1);
+	  			words_arr[idx] = separate;
+	  			separate = strtok(NULL,MAIN_TOK_DELIM);
+	  			idx++;
+	  		}
+	  		
+	  		struct command_structure *sub_command;
+	  		sub_command = (struct command_structure *)malloc(sizeof(struct command_structure));
+	  		sub_command->variant = var;
+	  		char ** command = (char **)malloc((words+1) * sizeof(char *));
+	  		int index = 0;
+	  		for(int j=0;j<words;j++)
+	  		{
+	  			if(strcmp(words_arr[j],"<") == 0)
+	  			{
+	  				char * input;
+	  				input = (char *)malloc(strlen(words_arr[j+1])+1);
+	  				input = words_arr[j+1];
+	  				sub_command->input_file = input;
+	  				j++;
+	  			}
+	  			else if((strcmp(words_arr[j],">") == 0) || (strcmp(words_arr[j],">>") == 0))
+	  			{
+	  				char * output;
+	  				output = (char *)malloc(strlen(words_arr[j+1])+1);
+	  				output = words_arr[j+1];
+	  				sub_command->output_file = output;
+	  				j++;
+	  			}
+	  			else
+	  			{
+	  				command[index] = words_arr[j];
+	  				index++;
+	  			}
+	  		}
+	  		command[index] = NULL;
+	  		sub_command->argv = command;
+	  		cmd[i] = sub_command;
+	  	}
+	  	fork_pipes(pipe_count,cmd);
+		return 0;
+	}	
 	int words = count_of_words_in_str(command);
 	char * echo_helper = (char *) malloc(512);
 	strcpy(echo_helper,command);
@@ -328,6 +588,7 @@ int parse_individual_command(char* command)
 			break;
 		}
 	}
+	
 	if(is_builtin && builtin_index==2)
 	{
 		// search for 'e'
@@ -413,6 +674,11 @@ int parse_individual_command(char* command)
 				if(is_background)
 					setpgid(0,0);
 				int status = execvp(new_arg_list[0],new_arg_list);
+				if(status == -1)
+				{
+					perror(strerror(errno));
+					exit(0);
+				}
 			}
 			else
 			{

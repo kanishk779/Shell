@@ -523,6 +523,7 @@ int m_unsetenv(char ** arguments,int number_of_args)
 	}
 	return 0;
 }
+
 void history(int how_many)
 {
 	count = how_many;

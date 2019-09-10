@@ -4,7 +4,9 @@
 #define clear() printf("\033[H\033[J")
 #define MAIN_TOK_DELIM " \t\r\n\a"
 #define COMMAND_DELIM ";"
-#define NO_OF_BUILTIN 13
+#define PIPE_DELIM "|"
+#define REDIRECTION_DELIM " ><>>"
+#define NO_OF_BUILTIN 12
 #define HOST_NAME_MAXIMUM 100
 #define LOGIN_NAME_MAXIMUM 100
 #define MAX_COMMAND_LEN 500
