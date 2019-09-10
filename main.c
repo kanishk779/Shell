@@ -155,6 +155,7 @@ void init_shell()
 	builtins[9] = "pwd";
 	builtins[10]= "setenv";
 	builtins[11]= "unsetenv";
+	builtins[12]= "cronjob";
 
 	printf("------------------------This is shell inside shell ----------------\n");
 }
@@ -588,8 +589,56 @@ int parse_individual_command(char* command)
 			break;
 		}
 	}
-	
-	if(is_builtin && builtin_index==2)
+	if(is_builtin && builtin_index==12)
+	{
+		int idx = 0;
+		char **new_arg_list = (char **)malloc((words-3)*sizeof(char*));
+		char * separate = strtok(NULL,MAIN_TOK_DELIM);
+		int command_started = false;
+		int command_stopped = false;
+		char * prev;
+		int t,p;
+		while(separate != NULL)
+		{
+			if(strcmp(separate,"-c") == 0)
+			{
+				command_started = true;
+				separate = strtok(NULL,MAIN_TOK_DELIM);
+				continue;
+			}
+			if(strcmp(separate , "-t") == 0)
+			{
+				command_started = false;
+				command_stopped = true;
+				prev = separate;
+				separate = strtok(NULL,MAIN_TOK_DELIM);
+				continue;
+			}
+			if(strcmp(separate , "-p") == 0)
+			{
+				prev = separate;
+			}
+			if(command_stopped && (strcmp(prev,"-t") == 0))
+			{
+				t = stringToInt(separate);
+			}
+			if(command_stopped && (strcmp(prev,"-p") == 0))
+			{
+				p = stringToInt(separate);
+			}
+			if(command_started)
+			{
+				int len = strlen(separate);
+				new_arg_list[idx] = (char *)malloc(len+1);
+				new_arg_list[idx] = separate;
+				idx++;
+			}
+			separate = strtok(NULL,MAIN_TOK_DELIM);
+		}
+		new_arg_list[idx]=NULL;
+		cronjob(new_arg_list,t,p);
+	}
+	else if(is_builtin && builtin_index==2)
 	{
 		// search for 'e'
 		char c;

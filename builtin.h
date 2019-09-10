@@ -83,5 +83,11 @@ Sets the value of the environment variable
 */
 int m_unsetenv(char ** arguments,int number_of_args);
 
-
+/*
+Runs a commands repeatedly over a period 'p' after every 't' seconds
+@param[in]		command 		the command that needs to be executed
+@param[in]		p 				the total time period given
+@param[in]		t 				the time between successive runs of the command
+*/
+void cronjob(char ** command, int t ,int p);
 #endif

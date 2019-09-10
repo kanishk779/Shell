@@ -6,7 +6,7 @@
 #define COMMAND_DELIM ";"
 #define PIPE_DELIM "|"
 #define REDIRECTION_DELIM " ><>>"
-#define NO_OF_BUILTIN 12
+#define NO_OF_BUILTIN 13
 #define HOST_NAME_MAXIMUM 100
 #define LOGIN_NAME_MAXIMUM 100
 #define MAX_COMMAND_LEN 500

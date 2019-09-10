@@ -523,7 +523,34 @@ int m_unsetenv(char ** arguments,int number_of_args)
 	}
 	return 0;
 }
-
+void cronjob(char ** command, int t ,int p)
+{
+	int number_of_times = (p/t);
+	for(int i=0;i<number_of_times;i++)
+	{
+		sleep(t);
+		pid_t pid;
+		if((pid = fork()) == 0)
+		{
+			execvp(command[0],command);
+		}
+		else if(pid < 0)
+		{
+			perror("error in forking the child\n");
+			exit(1);
+		}
+		else
+		{
+			// parent 
+			int status;
+			pid_t pid_returned = waitpid(pid,&status,0);
+			if(WEXITSTATUS(status))
+				printf("The process with pid - %u exited \n",pid_returned);
+			else if(WIFSIGNALED(status))
+				printf("The process with pid - %u was signalled \n",pid_returned);
+		}
+	}
+}
 void history(int how_many)
 {
 	count = how_many;
