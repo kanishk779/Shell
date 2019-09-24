@@ -449,12 +449,12 @@ void display_Queue(int how_many)
    		{
    			// show everything
    			for(int i=rear;i>=front;i--)
-   			printf("%s",arr[i]); 
+   			printf("%s\n",arr[i]); 
    		}
    		else
    		{
    			for (int i = rear; i >= rear-how_many+1; i--) 
-           	printf("%s",arr[i]);
+           	printf("%s\n",arr[i]);
    		}
    	} 
    	else
@@ -463,25 +463,25 @@ void display_Queue(int how_many)
   		{
   			for (int i = rear; i>=0; i--) 
   			{
-           		printf("%s", arr[i]);
+           		printf("%s\n", arr[i]);
        			int remaining = how_many-rear-1;
   		   		if(remaining >= (QUEUE_SIZE - front))
         		{
         		// show everything that is present in the queue
         			for(int i=QUEUE_SIZE-1;i>=front;i--)
-        			printf("%s",arr[i]);
+        			printf("%s\n",arr[i]);
         		}
         		else
         		{
         			for(int i=QUEUE_SIZE-1;i>=QUEUE_SIZE-remaining;i--)
-        			printf("%s",arr[i]);
+        			printf("%s\n",arr[i]);
         		}
         	}
   		}
   		else
   		{
   			for(int i= rear;i>=rear-how_many+1;i--)
-  				printf("%s",arr[i]);
+  				printf("%s\n",arr[i]);
   		}		
     } 
 }
