@@ -34,7 +34,7 @@ of the home-directory.
 @param[in]		home_dir 	home directory determined in the
 							beginning of the program.
 @return 		the absolute or relative path.
-*/
+*/ 
 char * give_relative_or_absolute_path(char * curr_dir,char* home_dir);
 /*
 Parse the semi-colon separated list of commands

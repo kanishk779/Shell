@@ -8,6 +8,9 @@ char *builtins[NO_OF_BUILTIN];
 int rear,front,size;
 char **arr;
 int used[QUEUE_SIZE];
+pid_t shell_pgid;
+struct termios shell_tmodes;
+int shell_terminal;
 void handler()
 {
 	int status;
@@ -126,6 +129,32 @@ int main()
 void init_shell()
 {
 	clear();
+	shell_terminal = STDIN_FILENO;
+
+	while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
+        kill (shell_pgid, SIGTTIN);
+
+    /* Ignore interactive and job-control signals.  */
+    signal (SIGINT, SIG_IGN);
+    signal (SIGQUIT, SIG_IGN);
+    signal (SIGTSTP, SIG_IGN);
+    signal (SIGTTIN, SIG_IGN);
+    signal (SIGTTOU, SIG_IGN);
+    signal (SIGCHLD, SIG_IGN);
+
+      /* Put ourselves in our own process group.  */
+    shell_pgid = getpid ();
+    if (setpgid (shell_pgid, shell_pgid) < 0)
+    {
+        perror ("Couldn't put the shell in its own process group");
+        exit (1);
+    }
+
+    /* Grab control of the terminal.  */
+    tcsetpgrp (shell_terminal, shell_pgid);
+
+    /* Save default terminal attributes for shell.  */
+    tcgetattr (shell_terminal, &shell_tmodes);
     size = QUEUE_SIZE;
 	rear = front = -1;
 	arr = (char **)malloc(QUEUE_SIZE * (sizeof(char *)));
@@ -224,13 +253,59 @@ int count_of_words_in_str(char * str)
 		words++;
 	return words;
 }
-struct command_structure
+typedef struct command_structure
 {
-    char **argv;
-    char * input_file;
-    char * output_file;
-    int variant;
-};
+	struct command_structure *next; /* next command in pipeline */
+    char **argv;					/* argument list for executing command */
+    char * input_file;				/* input file (if redirection present)*/
+    char * output_file;				/* output file (if redirection present) */
+    int completed;					/* is the command completed */
+    int stopped;					/* is the command stopped. */
+    int status;						/* status of the command */
+    pid_t pid;						/* pid of the command */
+    int variant;					/* used for deciding type of redirection */
+} command_structure;
+typedef struct job
+{
+	struct job *next;           /* next active job */
+	char *command;              /* command line, used for messages */
+	command_structure *first_command;     /* list of processes in this job */
+	pid_t pgid;                 /* process group ID */
+	int notified;              /* true if user told about stopped job */
+	struct termios tmodes;      /* saved terminal modes */
+} job;
+job * first_job;
+job *find_job (pid_t pgid)
+{
+  	job *j;
+
+  	for (j = first_job; j; j = j->next)
+    if (j->pgid == pgid)
+      	return j;
+  	return NULL;
+}
+
+/* Return true if all processes in the job have stopped or completed.  */
+int job_is_stopped (job *j)
+{
+  	command_structure *p;
+
+  	for (p = j->first_command; p; p = p->next)
+    	if (!p->completed && !p->stopped)
+      		return 0;
+  	return 1;
+}
+
+/* Return true if all processes in the job have completed.  */
+int job_is_completed (job *j)
+{
+  	command_structure *p;
+
+  	for (p = j->first_command; p; p = p->next)
+    	if (!p->completed)
+      	return 0;
+  	return 1;
+}
 
 void parse_commands(char* commands)
 {
