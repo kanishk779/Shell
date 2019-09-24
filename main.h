@@ -13,6 +13,30 @@
 #define QUEUE_SIZE 20
 #define PATH_MAXIMUM 1024
 
+typedef struct command_structure
+{
+	struct command_structure *next; /* next command in pipeline */
+    char **argv;					/* argument list for executing command */
+    char * input_file;				/* input file (if redirection present)*/
+    char * output_file;				/* output file (if redirection present) */
+    int completed;					/* is the command completed */
+    int stopped;					/* is the command stopped. */
+    int status;						/* status of the command */
+    pid_t pid;						/* pid of the command */
+    int variant;					/* used for deciding type of redirection */
+    char * command_name;			/* name of the command */
+} command_structure;
+typedef struct job
+{
+	struct job *next;           	/* next active job */
+	char *command;              	/* command line, used for messages */
+	command_structure *first_command;     /* list of processes in this job */
+	pid_t pgid;                 	/* process group ID */
+	int notified;              		/* true if user told about stopped job */
+	struct termios tmodes;      	/* saved terminal modes */
+	int foreground;					/* is the process foreground*/
+	char * job_name;				/* name of the job */
+} job;
 /*
 This function displays the initial information to the user,
 when starting the shell. It also initialises the variables.
@@ -34,7 +58,7 @@ of the home-directory.
 @param[in]		home_dir 	home directory determined in the
 							beginning of the program.
 @return 		the absolute or relative path.
-*/
+*/ 
 char * give_relative_or_absolute_path(char * curr_dir,char* home_dir);
 /*
 Parse the semi-colon separated list of commands
@@ -100,6 +124,86 @@ int m_strlen(char *str);
 reads a line of command from the terminal
 */
 char * m_shell_read_line();
+
+/*
+inserts the command int the job's linked list of commands
+@param[in]		process 	the command to be inserted
+@param[in]		j 			the job in which the command is to be inserted
+*/
+void insert_command_structure(command_structure * process,job *j);
+
+/*
+adds the job to the linked list of jobs
+@param[in]		new_job		the job to be inserted into the global list of jobs
+*/
+void insert_job(job * new_job);
+
+/*
+initialises the empty job 
+@return 		The empty job
+*/
+job* init_job();
+
+/*
+moves the background process into the foreground with specified job number
+@param[in]		job_number 		job number of the background process
+*/
+void fg(int job_number);
+
+/*
+removes the completed jobs from the linked list of the jobs
+*/
+void remove_completed_jobs();
+
+/*
+kills all the background processes
+*/
+void overkill();
+
+/*
+shows all the jobs which are running or stopped
+*/
+void show_jobs();
+
+/*
+sends a signal to the job
+@param[in]		job_number 		to which the signal has to be sent
+@param[in]		signal_number	which signal to send
+*/
+void kjob(int job_number ,int signal_number);
+
+/*
+signal handler for ctrl-c
+*/
+void ctrl_c_handler(int signo);
+
+/*
+signal handler for ctrl-z
+*/
+void ctrl_z_handler(int signo);
+
+/*
+initialises an empty command_structure
+*/
+command_structure * init_command_structure();
+
+/*
+finds the job with mentioned pgid
+*/
+job *find_job (pid_t pgid);
+int job_is_stopped (job *j);
+int job_is_completed (job *j);
+void put_job_in_foreground(job * j,int cont);
+void wait_for_job (job *j);
+void format_job_info (job *j, const char *status);
+int mark_process_status (pid_t pid, int status);
+void update_status (void);
+int run_command(char * command);
+void do_job_notification (void);
+void mark_job_as_running (job *j);
+void continue_job (job *j, int foreground);
+void put_job_in_background(job * j,int cont);
+int is_it_background(char * command);
 #endif
 
 	
