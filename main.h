@@ -24,15 +24,18 @@ typedef struct command_structure
     int status;						/* status of the command */
     pid_t pid;						/* pid of the command */
     int variant;					/* used for deciding type of redirection */
+    char * command_name;			/* name of the command */
 } command_structure;
 typedef struct job
 {
-	struct job *next;           /* next active job */
-	char *command;              /* command line, used for messages */
+	struct job *next;           	/* next active job */
+	char *command;              	/* command line, used for messages */
 	command_structure *first_command;     /* list of processes in this job */
-	pid_t pgid;                 /* process group ID */
-	int notified;              /* true if user told about stopped job */
-	struct termios tmodes;      /* saved terminal modes */
+	pid_t pgid;                 	/* process group ID */
+	int notified;              		/* true if user told about stopped job */
+	struct termios tmodes;      	/* saved terminal modes */
+	int foreground;					/* is the process foreground*/
+	char * job_name;				/* name of the job */
 } job;
 /*
 This function displays the initial information to the user,
@@ -200,6 +203,7 @@ void do_job_notification (void);
 void mark_job_as_running (job *j);
 void continue_job (job *j, int foreground);
 void put_job_in_background(job * j,int cont);
+int is_it_background(char * command);
 #endif
 
 	

@@ -151,6 +151,85 @@ command_structure * init_command_structure()
 	command->pid = -1;
 	return command;
 }
+void insert_command_structure(command_structure * command,job * j)
+{
+	command_structure ** temp = &(j->first_command);
+	if(*temp == NULL)
+	{
+		*temp = command;
+		return ;
+	}
+	while((*temp)->next != NULL)
+	{
+		*temp = (*temp)->next;
+	} 
+	(*temp)->next = command;
+	return ;
+}
+void insert_job(job * new_job)
+{
+	job ** temp = &(first_job);
+	if(*temp == NULL)
+	{
+		*temp = new_job;
+		return;
+	}
+	while((*temp)->next != NULL)
+		*temp = (*temp)->next;
+	(*temp)->next = new_job;
+	return ;
+}
+void put_job_in_foreground(job * j,int cont)	
+{
+	/* Put the job into the foreground.  */
+  	tcsetpgrp (shell_terminal, j->pgid);
+
+  	/* Send the job a continue signal, if necessary.  */
+  	if (cont)
+    {
+      	tcsetattr (shell_terminal, TCSADRAIN, &j->tmodes);
+      	if(kill (- j->pgid, SIGCONT) < 0)
+        	perror ("kill (SIGCONT)");
+    }
+
+  	/* Wait for it to report.  */
+  	wait_for_job (j);
+
+  	/* Put the shell back in the foreground.  */
+  	tcsetpgrp (shell_terminal, shell_pgid);
+
+  	/* Restore the shell’s terminal modes.  */
+  	tcgetattr (shell_terminal, &j->tmodes);
+  	tcsetattr (shell_terminal, TCSADRAIN, &shell_tmodes);
+}
+void put_job_in_background(job * j,int cont)
+{
+	/* Send the job a continue signal, if necessary.  */
+  	if (cont)
+    	if (kill (-j->pgid, SIGCONT) < 0)
+      		perror ("kill (SIGCONT)");
+}
+/* Check for processes that have status information available,
+   blocking until all processes in the given job have reported.  */
+
+void wait_for_job (job *j)
+{
+  int status;
+  pid_t pid;
+
+  do
+    pid = waitpid (WAIT_ANY, &status, WUNTRACED);
+  while (!mark_process_status (pid, status)
+         && !job_is_stopped (j)
+         && !job_is_completed (j));
+}
+
+/* Format information about job status for the user to look at.  */
+
+void format_job_info (job *j, const char *status)
+{
+  fprintf (stderr, "%ld (%s): %s\n", (long)j->pgid, status, j->command);
+}
 void init_shell()
 {
 	clear();
@@ -339,7 +418,7 @@ void parse_commands(char* commands)
 	}
 	free(commands_array);
 }
-int spawn_proc (int in, int out, struct command_structure *cmd) {
+int spawn_proc (int in, int out, job * j,struct command_structure *cmd) {
 	// 5 cases can occur
 	// case 0 -> no redirection is present
 	// case 1 -> cmd < input
@@ -349,7 +428,8 @@ int spawn_proc (int in, int out, struct command_structure *cmd) {
 	// case 5 -> cmd < input >> somefile
     pid_t pid;
     if ((pid = fork ()) == 0) {
-    	
+    	if (j->pgid == -1) j->pgid = pid;
+      	setpgid (pid, j->pgid);
         if (in != 0) {
             dup2 (in, 0);
             close (in);
@@ -358,7 +438,18 @@ int spawn_proc (int in, int out, struct command_structure *cmd) {
             dup2 (out, 1);
             close (out);
         }
-        
+        signal (SIGINT, SIG_DFL);
+      	signal (SIGQUIT, SIG_DFL);
+      	signal (SIGTSTP, SIG_DFL);
+      	signal (SIGTTIN, SIG_DFL);
+      	signal (SIGTTOU, SIG_DFL);
+      	signal (SIGCHLD, SIG_DFL);
+      
+
+      	
+      	// what is to be done here
+      	if (j->foreground)
+        	tcsetpgrp (shell_terminal, j->pgid);
         switch(cmd->variant)
         {
         	case 0:
@@ -444,8 +535,10 @@ int spawn_proc (int in, int out, struct command_structure *cmd) {
     }
     else
     {
-    	int status;
-    	waitpid(pid,&status,0);
+    	cmd->pid = pid;
+    	if (j->pgid == -1) j->pgid = pid;
+      	setpgid (pid, j->pgid);
+      	tcsetpgrp(shell_terminal,j->pgid);
     }
     return pid;
 }
@@ -454,22 +547,279 @@ int spawn_proc (int in, int out, struct command_structure *cmd) {
 This function will be called if there are pipes or 
 redirection in the command given the by the user.
 */
-int fork_pipes (int n, struct command_structure **cmd) {
-    int i;
+int mark_process_status (pid_t pid, int status)
+{
+  job *j;
+  command_structure *p;
+
+  if (pid > 0)
+    {
+      /* Update the record for the process.  */
+      for (j = first_job; j; j = j->next)
+        for (p = j->first_command; p; p = p->next)
+          if (p->pid == pid)
+            {
+              p->status = status;
+              if (WIFSTOPPED (status))
+                p->stopped = 1;
+              else
+                {
+                  p->completed = 1;
+                  if (WIFSIGNALED (status))
+                    fprintf (stderr, "%d: Terminated by signal %d.\n",
+                             (int) pid, WTERMSIG (p->status));
+                }
+              return 0;
+             }
+      fprintf (stderr, "No child process %d.\n", pid);
+      return -1;
+    }
+  else if (pid == 0 || errno == ECHILD)
+    /* No processes ready to report.  */
+    return -1;
+  else {
+    /* Other weird errors.  */
+    perror ("waitpid");
+    return -1;
+  }
+}
+
+/* Check for processes that have status information available,
+   without blocking.  */
+
+void update_status (void)
+{
+  	int status;
+  	pid_t pid;
+
+  	do
+    	pid = waitpid (WAIT_ANY, &status, WUNTRACED|WNOHANG);
+  	while (!mark_process_status (pid, status));
+}
+
+
+
+/* Notify the user about stopped or terminated jobs.
+   Delete terminated jobs from the active job list.  */
+
+void do_job_notification (void)
+{
+  job *j, *jlast, *jnext;
+  command_structure *p;
+
+  /* Update status information for child processes.  */
+  update_status ();
+
+  jlast = NULL;
+  for (j = first_job; j; j = jnext)
+    {
+      jnext = j->next;
+
+      /* If all processes have completed, tell the user the job has
+         completed and delete it from the list of active jobs.  */
+      if (job_is_completed (j)) {
+        format_job_info (j, "completed");
+        if (jlast)
+          jlast->next = jnext;
+        else
+          first_job = jnext;
+      // how to implement this function
+        //free_job (j);
+      }
+
+      /* Notify the user about stopped jobs,
+         marking them so that we won’t do this more than once.  */
+      else if (job_is_stopped (j) && !j->notified) {
+        format_job_info (j, "stopped");
+        j->notified = 1;
+        jlast = j;
+      }
+
+      /* Don’t say anything about jobs that are still running.  */
+      else
+        jlast = j;
+    }
+}
+int fork_pipes (int n,job * new_job) {
+    command_structure* i;
     int in, fd [2];
     in = 0;
-    for (i = 0; i < n; ++i) {
+    for (i = new_job->first_command; i; i=i->next) {
         pipe (fd);
-    	spawn_proc(in,fd[1],cmd[i]);
+        if(i->next)
+    		spawn_proc(in,fd[1],new_job,i);
+    	else
+    		spawn_proc(in,1,new_job,i);
         close (fd [1]);
         in = fd [0];
     }
-    if(in != 0)
-    	dup2 (in, 0);
-    spawn_proc(in,1,cmd[i]);
-    int status;
-    waitpid(-1,&status,0);
+    format_job_info(new_job,"job started");
+    if(new_job->foreground)
+    	put_job_in_foreground(new_job,0);
+    else
+    	put_job_in_background(new_job,0);
     return 0;
+}
+void mark_job_as_running (job *j)
+{
+  command_structure *p;
+
+  for (p = j->first_command; p; p = p->next)
+    p->stopped = 0;
+  j->notified = 0;
+}
+
+/* Continue the job J.  */
+
+void continue_job (job *j, int foreground)
+{
+  mark_job_as_running (j);
+  if (foreground)
+    put_job_in_foreground (j, 1);
+  else
+    put_job_in_background (j, 1);
+}
+void show_jobs()
+{
+	int count = 1;
+	job * temp = first_job;
+	while(temp != NULL)
+	{
+		int stopped = job_is_stopped(temp);
+		if(stopped)
+			printf("[%d] Stopped %s [%u]",count,temp->job_name,temp->pgid);
+		else
+			printf("[%d] Running %s [%u]",count,temp->job_name,temp->pgid);
+		count++;
+		temp = temp->next;
+	}
+}
+void kjob(int job_number,int signal_number)
+{
+	int count = 1;
+	job * temp = first_job;
+	int found_job = false;
+	while(temp != NULL)
+	{
+		if(count == job_number)
+		{
+			found_job = true;
+			signal(signal_number,SIG_DFL);
+			break;
+		}
+		else
+		{
+			temp = temp->next;
+		}
+	}
+	if(!found_job)
+		printf("No job exist with this job number\n");
+}
+void fg(int job_number)
+{
+	// only count the background jobs while traversing
+	//remove_completed_jobs();
+	do_job_notification();
+	int count = 0;
+	job * temp = first_job;
+	int found_job = false;
+	while(temp != NULL)
+	{
+		if(!temp->foreground)
+		{
+			count++;
+			if(count == job_number)
+			{
+				put_job_in_foreground(temp,1);
+				break;
+			}
+		}
+		temp = temp->next;
+	}
+	if(!found_job)
+		printf("job was not found\n");
+}
+// change from a stopped background job to running background job
+void bg(int job_number)
+{
+	//remove_completed_jobs();
+	do_job_notification();
+	int count = 0;
+	job * temp = first_job;
+	int found_job = false;
+	while(temp != NULL)
+	{
+		if(!temp->foreground)
+		{
+			count++;
+			if(count == job_number)
+			{
+				put_job_in_background(temp,1);
+				break;
+			}
+		}
+		temp = temp->next;
+	}
+	if(!found_job)
+		printf("job was not found\n");
+}
+void remove_completed_jobs()
+{
+	job* prev = NULL;
+	job* curr = first_job;
+	while(curr)
+	{
+		int complete = job_is_completed(curr);
+		if(complete)
+		{
+			if(prev != NULL)
+			{
+				prev->next = curr->next;
+				curr = curr->next;
+				free(curr);
+			}
+			else
+			{
+				if(curr->next == NULL)
+				{
+					first_job = NULL;
+					curr = NULL;
+				}
+				else
+				{
+					first_job = curr->next;
+					curr = curr->next;
+					free(curr);
+				}
+			}
+			continue;
+		}
+		prev = curr;
+		curr = curr->next;
+	}
+}
+// kill all the background processes
+void overkill()
+{
+	job * temp = first_job;
+	while(temp)
+	{
+		if(!temp->foreground)
+		{
+			if(kill(temp->pgid,SIGKILL) == -1)
+				perror("error in killing job\n");
+		}
+		temp = temp->next;
+	}
+}
+void ctrl_z_handler(int signo)
+{
+	printf("\n");
+}
+void ctrl_c_handler(int signo)
+{
+	// find the foreground process running in the shell
+	printf("\n");
 }
 /*
 strtok() will remember which string it operated on last time even if a function 
@@ -576,15 +926,32 @@ int stringToInt(char * str)
 	}
 	return result;
 }
+int is_it_background(char * command)
+{
+	int len = strlen(command);
+	int background = false;
+	for(int i=0;i<len;i++)
+	{
+		if(command[i] == '&')
+			background = true;
+	}
+	return background;
+}
 int parse_individual_command(char* command)
 {
 	// The function will only work if up command is given
 	if(parse_up_command(command))
 		return 0;
 	int pipe_count = give_count_of_pipes(command);
-	if(pipe_count >= 1)
+	int redirection_present = determine_case(command);
+	if(pipe_count >= 1 || redirection_present)
 	{
 		//separate on the basis of Pipe
+		// create a job here
+		job* new_job = init_job();
+		new_job->job_name = command;
+		int back = is_it_background(command);
+		int pipe_count = give_count_of_pipes(command);
 		char ** arr = (char **)malloc((pipe_count+1)*sizeof(char *));
 		char * separate = strtok(command,PIPE_DELIM);
 		int idx = 0;
@@ -596,8 +963,7 @@ int parse_individual_command(char* command)
 			separate = strtok(NULL,PIPE_DELIM);
 			idx++;
 		}
-		struct command_structure ** cmd;
-		cmd = (struct command_structure **)malloc((pipe_count+1)*sizeof(struct command_structure *));
+		
 	  	for(int i=0;i<=pipe_count;i++)
 	  	{
 	  		// first tokenize the string;
@@ -616,7 +982,8 @@ int parse_individual_command(char* command)
 	  		}
 	  		
 	  		struct command_structure *sub_command;
-	  		sub_command = (struct command_structure *)malloc(sizeof(struct command_structure));
+	  		sub_command = init_command_structure();
+
 	  		sub_command->variant = var;
 	  		char ** command = (char **)malloc((words+1) * sizeof(char *));
 	  		int index = 0;
@@ -646,9 +1013,36 @@ int parse_individual_command(char* command)
 	  		}
 	  		command[index] = NULL;
 	  		sub_command->argv = command;
-	  		cmd[i] = sub_command;
+	  		//insert_command_structure(sub_command,new_job);
+	  		if(new_job->first_command == NULL)
+	  		{
+	  			new_job->first_command = sub_command;
+	  		}
+	  		else
+	  		{
+	  			command_structure * temp = new_job->first_command;
+	  			while(temp->next != NULL)
+	  				temp = temp->next;
+	  			temp->next = sub_command;
+	  		}
+	  		
 	  	}
-	  	fork_pipes(pipe_count,cmd);
+	  	// insert the job into job list
+	  	if(!back)
+	  		new_job->foreground = true;
+	  	//insert_job(new_job);
+	  	if(first_job == NULL)
+	  	{
+	  		first_job = new_job;
+	  	}
+	  	else
+	  	{
+	  		job * temp = first_job;
+	  		while(temp->next != NULL)
+	  			temp = temp->next;
+	  		temp->next = new_job;
+	  	}
+	  	fork_pipes(pipe_count,new_job);
 		return 0;
 	}	
 	int words = count_of_words_in_str(command);
