@@ -11,6 +11,7 @@ int used[QUEUE_SIZE];
 pid_t shell_pgid;
 struct termios shell_tmodes;
 int shell_terminal;
+job * first_job;
 void handler()
 {
 	int status;
@@ -125,6 +126,30 @@ int main()
 		free(line);
 	}
 	return 0;
+}
+
+job * init_job()
+{
+	job * new_job = (job *)malloc(sizeof(job));
+	new_job->next = NULL;
+	new_job->command = NULL;
+	new_job->first_command = NULL;
+	new_job->pgid = -1;
+	new_job->notified = 0;
+	return new_job;
+}
+command_structure * init_command_structure()
+{
+	command_structure * command = (command_structure *)malloc(sizeof(command_structure));
+	command->next = NULL;
+	command->input_file = NULL;
+	command->output_file = NULL;
+	command->stopped = 0;
+	command->completed = 0;
+	command->status = 0;
+	command->variant = -1;
+	command->pid = -1;
+	return command;
 }
 void init_shell()
 {
@@ -253,28 +278,7 @@ int count_of_words_in_str(char * str)
 		words++;
 	return words;
 }
-typedef struct command_structure
-{
-	struct command_structure *next; /* next command in pipeline */
-    char **argv;					/* argument list for executing command */
-    char * input_file;				/* input file (if redirection present)*/
-    char * output_file;				/* output file (if redirection present) */
-    int completed;					/* is the command completed */
-    int stopped;					/* is the command stopped. */
-    int status;						/* status of the command */
-    pid_t pid;						/* pid of the command */
-    int variant;					/* used for deciding type of redirection */
-} command_structure;
-typedef struct job
-{
-	struct job *next;           /* next active job */
-	char *command;              /* command line, used for messages */
-	command_structure *first_command;     /* list of processes in this job */
-	pid_t pgid;                 /* process group ID */
-	int notified;              /* true if user told about stopped job */
-	struct termios tmodes;      /* saved terminal modes */
-} job;
-job * first_job;
+
 job *find_job (pid_t pgid)
 {
   	job *j;
