@@ -6,7 +6,7 @@
 #define COMMAND_DELIM ";"
 #define PIPE_DELIM "|"
 #define REDIRECTION_DELIM " ><>>"
-#define NO_OF_BUILTIN 13
+#define NO_OF_BUILTIN 18
 #define HOST_NAME_MAXIMUM 100
 #define LOGIN_NAME_MAXIMUM 100
 #define MAX_COMMAND_LEN 500
@@ -146,9 +146,15 @@ job* init_job();
 
 /*
 moves the background process into the foreground with specified job number
-@param[in]		job_number 		job number of the background process
+@param[in]		arguments 		job number of the background process
 */
-void fg(int job_number);
+void fg(char ** arguments ,int number_of_args);
+
+/*
+resumes the background process with specified job number
+@param[in]		arguments 		job number of the background process
+*/
+void bg(char ** arguments, int number_of_args);
 
 /*
 removes the completed jobs from the linked list of the jobs
@@ -170,17 +176,7 @@ sends a signal to the job
 @param[in]		job_number 		to which the signal has to be sent
 @param[in]		signal_number	which signal to send
 */
-void kjob(int job_number ,int signal_number);
-
-/*
-signal handler for ctrl-c
-*/
-void ctrl_c_handler(int signo);
-
-/*
-signal handler for ctrl-z
-*/
-void ctrl_z_handler(int signo);
+void kjob(char ** arguments,int number_of_args);
 
 /*
 initialises an empty command_structure
@@ -191,6 +187,13 @@ command_structure * init_command_structure();
 finds the job with mentioned pgid
 */
 job *find_job (pid_t pgid);
+
+/*
+converts a string to int
+*/
+int stringToInt(char * str);
+
+
 int job_is_stopped (job *j);
 int job_is_completed (job *j);
 void put_job_in_foreground(job * j,int cont);

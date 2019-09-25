@@ -589,7 +589,7 @@ void m_help(FILE * file){
   		 "  history      shows the last few commands given\n"
   		 "  nightswatch      change the working directory\n"
          "  ls             list the information about the current_directory\n"
-         "  exit 		exit the shell \n"
+         "  quit    		exit the shell \n"
          "  echo           Helps in printing the message given to it\n");
 }
 void m_exit()

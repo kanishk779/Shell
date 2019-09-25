@@ -15,16 +15,18 @@ job * first_job;
 void handler()
 {
 	int status;
-	pid_t w = waitpid(-1,&status,WNOHANG);
-	if(w == -1)
-	{
-		perror("There was error in wait_pid in handler\n");
-		exit(0);
-	}
-	if(WEXITSTATUS(status))
-		printf("The process with pid - %u exited \n",w);
-	else if(WIFSIGNALED(status))
-		printf("The process with pid - %u was signalled \n",w);
+	//pid_t w = waitpid(-1,&status,WNOHANG);
+	// here we need to the job notification
+	do_job_notification();
+	// if(w == -1)
+	// {
+	// 	perror("There was error in wait_pid in handler\n");
+	// 	exit(0);
+	// }
+	// if(WEXITSTATUS(status))
+	// 	printf("The process with pid - %u exited \n",w);
+	// else if(WIFSIGNALED(status))
+	// 	printf("The process with pid - %u was signalled \n",w);
 }
 char* remove_from_Queue()
 {
@@ -112,7 +114,7 @@ int main()
 {
 	// initialise shell and its variables
 	init_shell();
-	//signal(SIGCHLD,handler);
+	signal(SIGCHLD,handler);
 	int loop = true;
 	char *line;
 	while(loop)
@@ -136,6 +138,7 @@ job * init_job()
 	new_job->first_command = NULL;
 	new_job->pgid = -1;
 	new_job->notified = 0;
+	new_job->job_name = NULL;
 	return new_job;
 }
 command_structure * init_command_structure()
@@ -235,8 +238,8 @@ void init_shell()
 	clear();
 	shell_terminal = STDIN_FILENO;
 
-	while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
-        kill (shell_pgid, SIGTTIN);
+	// while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
+ //        kill (shell_pgid, SIGTTIN);
 
     /* Ignore interactive and job-control signals.  */
     signal (SIGINT, SIG_IGN);
@@ -276,19 +279,24 @@ void init_shell()
 		perror("could get username\n");
 		exit(1);
 	}
-	builtins[0] = "ls";
-	builtins[1] = "cd";
-	builtins[2] = "echo";
-	builtins[3] = "quit";
-	builtins[4] = "history";
-	builtins[5] = "help";
-	builtins[6] = "clear";
-	builtins[7] = "pinfo";
-	builtins[8] = "nightswatch";
-	builtins[9] = "pwd";
-	builtins[10]= "setenv";
-	builtins[11]= "unsetenv";
-	builtins[12]= "cronjob";
+	builtins[0] = "ls"; // working(with error handling)
+	builtins[1] = "cd"; // working(with error handling)
+	builtins[2] = "echo"; // working
+	builtins[3] = "quit"; // working
+	builtins[4] = "history"; //working
+	builtins[5] = "help"; // working
+	builtins[6] = "clear";	// working
+	builtins[7] = "pinfo";  //working
+	builtins[8] = "nightswatch"; // working
+	builtins[9] = "pwd"; // working
+	builtins[10]= "setenv"; // working
+	builtins[11]= "unsetenv"; // working
+	builtins[12]= "cronjob"; // working
+	builtins[13]= "overkill"; // does nothing
+	builtins[14]= "kjob";
+	builtins[15]= "bg";  // not working
+	builtins[16]= "fg";  // not working
+	builtins[17]= "jobs"; // working correctly
 
 	printf("------------------------This is shell inside shell ----------------\n");
 }
@@ -549,39 +557,38 @@ redirection in the command given the by the user.
 */
 int mark_process_status (pid_t pid, int status)
 {
-  job *j;
-  command_structure *p;
+  	job *j;
+  	command_structure *p;
 
-  if (pid > 0)
+  	if (pid > 0)
     {
       /* Update the record for the process.  */
-      for (j = first_job; j; j = j->next)
-        for (p = j->first_command; p; p = p->next)
-          if (p->pid == pid)
+      	for (j = first_job; j; j = j->next)
+        	for (p = j->first_command; p; p = p->next)
+          	if (p->pid == pid)
             {
-              p->status = status;
-              if (WIFSTOPPED (status))
-                p->stopped = 1;
-              else
+              	p->status = status;
+              	if (WIFSTOPPED (status))
+                	p->stopped = 1;
+              	else
                 {
-                  p->completed = 1;
-                  if (WIFSIGNALED (status))
-                    fprintf (stderr, "%d: Terminated by signal %d.\n",
-                             (int) pid, WTERMSIG (p->status));
+                  	p->completed = 1;
+                  	if (WIFSIGNALED (status))
+                    	fprintf (stderr, "%d: Terminated by signal %d.\n",(int) pid, WTERMSIG (p->status));
                 }
               return 0;
-             }
-      fprintf (stderr, "No child process %d.\n", pid);
-      return -1;
+            }
+      	fprintf (stderr, "No child process %d.\n", pid);
+      	return -1;
     }
-  else if (pid == 0 || errno == ECHILD)
+  	else if (pid == 0 || errno == ECHILD)
     /* No processes ready to report.  */
     return -1;
-  else {
+  	else {
     /* Other weird errors.  */
     perror ("waitpid");
     return -1;
-  }
+  	}
 }
 
 /* Check for processes that have status information available,
@@ -624,7 +631,7 @@ void do_job_notification (void)
         else
           first_job = jnext;
       // how to implement this function
-        //free_job (j);
+        free_job (j);
       }
 
       /* Notify the user about stopped jobs,
@@ -687,15 +694,22 @@ void show_jobs()
 	{
 		int stopped = job_is_stopped(temp);
 		if(stopped)
-			printf("[%d] Stopped %s [%u]",count,temp->job_name,temp->pgid);
+			printf("[%d] Stopped %s [%u]\n",count,temp->job_name,temp->pgid);
 		else
-			printf("[%d] Running %s [%u]",count,temp->job_name,temp->pgid);
+			printf("[%d] Running %s [%u]\n",count,temp->job_name,temp->pgid);
 		count++;
 		temp = temp->next;
 	}
 }
-void kjob(int job_number,int signal_number)
+void kjob(char ** arguments,int number_of_arguments)
 {
+	if(number_of_arguments < 2)
+	{
+		printf("Less arguments given\n");
+		return;
+	}
+	int job_number = stringToInt(arguments[0]);
+	int signal_number = stringToInt(arguments[1]);
 	int count = 1;
 	job * temp = first_job;
 	int found_job = false;
@@ -715,11 +729,22 @@ void kjob(int job_number,int signal_number)
 	if(!found_job)
 		printf("No job exist with this job number\n");
 }
-void fg(int job_number)
+void fg(char ** arguments,int number_of_arguments)
 {
+	if(number_of_arguments > 1)
+	{
+		printf("too many arguments\n");
+		return;
+	}
+	if(number_of_arguments == 0)
+	{
+		printf("give the job number\n");
+		return;
+	}
 	// only count the background jobs while traversing
-	//remove_completed_jobs();
-	do_job_notification();
+	int job_number = stringToInt(arguments[0]);
+	remove_completed_jobs();
+	//do_job_notification();
 	int count = 0;
 	job * temp = first_job;
 	int found_job = false;
@@ -730,7 +755,8 @@ void fg(int job_number)
 			count++;
 			if(count == job_number)
 			{
-				put_job_in_foreground(temp,1);
+				//put_job_in_foreground(temp,1);
+				continue_job(temp,0);
 				break;
 			}
 		}
@@ -740,10 +766,21 @@ void fg(int job_number)
 		printf("job was not found\n");
 }
 // change from a stopped background job to running background job
-void bg(int job_number)
+void bg(char ** arguments,int number_of_arguments)
 {
-	//remove_completed_jobs();
-	do_job_notification();
+	if(number_of_arguments > 1)
+	{
+		printf("too many arguments\n");
+		return;
+	}
+	if(number_of_arguments == 0)
+	{
+		printf("give the job number\n");
+		return;
+	}
+	remove_completed_jobs();
+	int job_number = stringToInt(arguments[0]);
+	//do_job_notification();
 	int count = 0;
 	job * temp = first_job;
 	int found_job = false;
@@ -811,15 +848,6 @@ void overkill()
 		}
 		temp = temp->next;
 	}
-}
-void ctrl_z_handler(int signo)
-{
-	printf("\n");
-}
-void ctrl_c_handler(int signo)
-{
-	// find the foreground process running in the shell
-	printf("\n");
 }
 /*
 strtok() will remember which string it operated on last time even if a function 
@@ -949,7 +977,10 @@ int parse_individual_command(char* command)
 		//separate on the basis of Pipe
 		// create a job here
 		job* new_job = init_job();
-		new_job->job_name = command;
+		int len = strlen(command);
+		char * name_of_job = (char *)malloc(len+2);
+		strcpy(name_of_job,command);
+		new_job->job_name = name_of_job;
 		int back = is_it_background(command);
 		int pipe_count = give_count_of_pipes(command);
 		char ** arr = (char **)malloc((pipe_count+1)*sizeof(char *));
@@ -1188,6 +1219,12 @@ int parse_individual_command(char* command)
 			}
 			if(pid_returned == 0)
 			{
+				signal (SIGINT, SIG_DFL);
+		      	signal (SIGQUIT, SIG_DFL);
+		      	signal (SIGTSTP, SIG_DFL);
+		      	signal (SIGTTIN, SIG_DFL);
+		      	signal (SIGTTOU, SIG_DFL);
+		      	signal (SIGCHLD, SIG_DFL);
 				pid_t pgrpid = getpgrp();
 				if((tcsetpgrp(2,pgrpid))<0)
 				{
@@ -1218,8 +1255,8 @@ int parse_individual_command(char* command)
 				else
 				{
 					// maybe use the handler
-					printf("[proc %d started]\n", pid_returned);
-					signal(SIGCHLD,handler);
+					printf("+ %d suspended \n", pid_returned);
+					//signal(SIGCHLD,handler);
 				}
 			}
 		}
@@ -1300,6 +1337,21 @@ void call_appropriate_function(int builtin_index,char ** options_array,int numbe
 			break;
 		case 11:
 			m_unsetenv(options_array,number_of_arguments);
+			break;
+		case 13:
+			overkill();
+			break;
+		case 14:
+			kjob(options_array,number_of_arguments);
+			break;
+		case 15:
+			bg(options_array,number_of_arguments);
+			break;
+		case 16:
+			fg(options_array,number_of_arguments);
+			break;
+		case 17:
+			show_jobs();
 			break;
 		default:
 			perror("Are you sane??\n");
