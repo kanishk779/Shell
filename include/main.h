@@ -10,9 +10,14 @@
 #define HOST_NAME_MAXIMUM 100
 #define LOGIN_NAME_MAXIMUM 100
 #define MAX_COMMAND_LEN 500
-#define QUEUE_SIZE 20
 #define PATH_MAXIMUM 1024
-
+char* home_directory;
+char hostname[HOST_NAME_MAXIMUM]; // also called as system/computer name
+char *username;
+char *builtins[NO_OF_BUILTIN];
+pid_t shell_pgid;
+struct termios shell_tmodes;
+int shell_terminal;
 typedef struct command_structure
 {
 	struct command_structure *next; /* next command in pipeline */
@@ -37,17 +42,12 @@ typedef struct job
 	int foreground;					/* is the process foreground*/
 	char * job_name;				/* name of the job */
 } job;
+job * first_job;
 /*
 This function displays the initial information to the user,
 when starting the shell. It also initialises the variables.
 */
 void init_shell();
-
-/*
-Shows the <username@system_name:curr_dir> prompt to the user 
-after executing every command.
-*/
-void show_user_sys_name();
 
 /*
 gives the relative path in-case the current directory is inside
@@ -77,19 +77,12 @@ int parse_individual_command(char* command);
 /*
 */
 char ** fill_argument_array(int words);
-/*
-gives the number of the words in the string given
-@param[in]		str 		string in which the number of words are to returned
-@return 		the number of words str
-*/
-int count_of_words_in_str(char * str);
 
 /*
-Gives the number of commands separated by semicolon
-@param[in]		str 		string for which no. of commands are to be returned
-@return 		the number of commands
+Shows the <username@system_name:curr_dir> prompt to the user 
+after executing every command.
 */
-int number_of_commands_separated_by_semicolon(char *str);
+void show_user_sys_name();
 
 /*
 Calls the appropriate builtin function passing it the options and arguments
@@ -114,29 +107,9 @@ shell supports.
 void m_help(FILE * file);
 
 /*
-gives the length of the string (in case strlen doesn't work)
-@param[in]		str 		the string whose length is calculated
-@return 		returns the length of the string
-*/
-int m_strlen(char *str);
-
-/*
 reads a line of command from the terminal
 */
 char * m_shell_read_line();
-
-/*
-inserts the command int the job's linked list of commands
-@param[in]		process 	the command to be inserted
-@param[in]		j 			the job in which the command is to be inserted
-*/
-void insert_command_structure(command_structure * process,job *j);
-
-/*
-adds the job to the linked list of jobs
-@param[in]		new_job		the job to be inserted into the global list of jobs
-*/
-void insert_job(job * new_job);
 
 /*
 initialises the empty job 
@@ -144,39 +117,7 @@ initialises the empty job
 */
 job* init_job();
 
-/*
-moves the background process into the foreground with specified job number
-@param[in]		arguments 		job number of the background process
-*/
-void fg(char ** arguments ,int number_of_args);
 
-/*
-resumes the background process with specified job number
-@param[in]		arguments 		job number of the background process
-*/
-void bg(char ** arguments, int number_of_args);
-
-/*
-removes the completed jobs from the linked list of the jobs
-*/
-void remove_completed_jobs();
-
-/*
-kills all the background processes
-*/
-void overkill();
-
-/*
-shows all the jobs which are running or stopped
-*/
-void show_jobs();
-
-/*
-sends a signal to the job
-@param[in]		job_number 		to which the signal has to be sent
-@param[in]		signal_number	which signal to send
-*/
-void kjob(char ** arguments,int number_of_args);
 
 /*
 initialises an empty command_structure
@@ -188,10 +129,6 @@ finds the job with mentioned pgid
 */
 job *find_job (pid_t pgid);
 
-/*
-converts a string to int
-*/
-int stringToInt(char * str);
 
 
 int job_is_stopped (job *j);
@@ -206,7 +143,7 @@ void do_job_notification (void);
 void mark_job_as_running (job *j);
 void continue_job (job *j, int foreground);
 void put_job_in_background(job * j,int cont);
-int is_it_background(char * command);
+
 #endif
 
 	

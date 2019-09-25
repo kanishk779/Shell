@@ -2,11 +2,8 @@
 #define _BUILTIN_H_
 #include"headerDependencies.h"
 #include"main.h"
-#define ANSI_COLOR_GRN   "\x1B[32m"
-#define ANSI_COLOR_BLU   "\x1B[34m"
-#define ANSI_COLOR_MAG   "\x1B[35m"
-#define ANSI_COLOR_RESET "\x1B[0m"
-#define PATH_M 1024
+#include "absolutePath.h"
+
 /*
 Similar to ls command
 @param[in] 		current_path			path of the current directory
