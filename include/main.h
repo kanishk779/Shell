@@ -130,7 +130,7 @@ finds the job with mentioned pgid
 job *find_job (pid_t pgid);
 
 
-
+int update_job_table(int pid, int status) ;
 int job_is_stopped (job *j);
 int job_is_completed (job *j);
 void put_job_in_foreground(job * j,int cont);

@@ -4,6 +4,8 @@
 #include "main.h"
 void show_jobs()
 {
+	// here we need to remove the jobs if they are completed(try this later)
+	
 	int count = 1;
 	job * temp = first_job;
 	while(temp != NULL)
@@ -69,7 +71,11 @@ void kjob(char ** arguments,int number_of_arguments)
 		if(count == job_number)
 		{
 			found_job = true;
-			signal(signal_number,SIG_DFL);
+
+			// should we send kill to all processes of that pipeline
+			command_structure * p;
+			for(p = temp->first_command;p;p = p->next)
+				kill(p->pid,signal_number);
 			break;
 		}
 		else
@@ -94,8 +100,7 @@ void fg(char ** arguments,int number_of_arguments)
 	}
 	// only count the background jobs while traversing
 	int job_number = stringToInt(arguments[0]);
-	remove_completed_jobs();
-	//do_job_notification();
+	
 	int count = 0;
 	job * temp = first_job;
 	int found_job = false;
@@ -106,8 +111,9 @@ void fg(char ** arguments,int number_of_arguments)
 			count++;
 			if(count == job_number)
 			{
-				//put_job_in_foreground(temp,1);
-				continue_job(temp,0);
+				// make the job as foreground
+				temp->foreground=1;
+				continue_job(temp,1);
 				break;
 			}
 		}
@@ -129,7 +135,6 @@ void bg(char ** arguments,int number_of_arguments)
 		printf("give the job number\n");
 		return;
 	}
-	remove_completed_jobs();
 	int job_number = stringToInt(arguments[0]);
 	//do_job_notification();
 	int count = 0;
@@ -155,14 +160,14 @@ void bg(char ** arguments,int number_of_arguments)
 // kill all the background processes
 void overkill()
 {
+	// send signals to all the jobs in the stopped or running in the background
 	job * temp = first_job;
 	while(temp)
 	{
-		if(!temp->foreground)
-		{
+		command_structure *p;
+		for(p=temp->first_command;p;p = p->next)
 			if(kill(temp->pgid,SIGKILL) == -1)
 				perror("error in killing job\n");
-		}
 		temp = temp->next;
 	}
 }

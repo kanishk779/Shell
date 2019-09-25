@@ -1,20 +1,87 @@
 #include "main.h"
 #include "history.h"
+#include "jobControl.h"
+
+// this the handler for the SIGHCHLD signal (raised when process is either completed or stopped)
 void handler()
 {
+	int pid;
 	int status;
-	//pid_t w = waitpid(-1,&status,WNOHANG);
-	// here we need to the job notification
-	do_job_notification();
-	// if(w == -1)
-	// {
-	// 	perror("There was error in wait_pid in handler\n");
-	// 	exit(0);
-	// }
-	// if(WEXITSTATUS(status))
-	// 	printf("The process with pid - %u exited \n",w);
-	// else if(WIFSIGNALED(status))
-	// 	printf("The process with pid - %u was signalled \n",w);
+	pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+	update_job_table(pid, status);
+	
+}
+
+int update_job_table(int pid, int status) 
+{
+	job *j;
+  	command_structure *p;
+  	if(pid > 0)
+    {
+      	for (j = first_job; j; j = j->next)
+        	for (p = j->first_command; p; p = p->next)
+          	{
+          		if (p->pid == pid)
+	            {
+	              	p->status = status;
+	              	if (WIFSTOPPED (status))
+	                {
+	                	p->stopped = 1;
+	                	if(!j->foreground)
+	                		printf("+ %d suspended \n", pid);
+	                }
+	              	else
+	                {
+	                  	p->completed = 1;
+	                  	if(!j->foreground)
+	                  		printf("%d completed \n", pid);
+	                  	remove_completed_jobs();
+	                  	if (WIFSIGNALED (status))
+	                    	fprintf (stderr, "%d: Terminated by signal %d.\n",(int) pid, WTERMSIG (p->status));
+	                }
+	              	return 0;
+	            }
+          	}
+      	fprintf (stderr, "No child process %d.\n", pid);
+      	return -1;
+    }
+  	else if (pid == 0 || errno == ECHILD)
+    {
+    	// there is no process that reported
+    	return -1;
+    }
+  	else 
+  	{
+	    /* Other weird errors.  */
+	    perror ("waitpid");
+	    return -1;
+  	}
+
+}
+/* Check for processes that have status information available,
+   blocking until all processes in the given job have reported.  */
+
+// void wait_for_job (job *j)
+// {
+//   int status;
+//   pid_t pid;
+
+//   do
+//     pid = waitpid (WAIT_ANY, &status, WUNTRACED);
+//   while (!mark_process_status (pid, status)
+//          && !job_is_stopped (j)
+//          && !job_is_completed (j));
+// }
+// call this function after execvp of a foreground process(it runs till child gives SIGCHLD)
+void wait_for_job (job *j)
+{
+  int status;
+  pid_t pid;
+
+  while (!job_is_stopped (j));
+
+  // now the job is stopped check if it completed or was it stopped(actually no need to check)
+  // the idea is to update the job linked list only when the user gives the command jobs
 }
 void init_shell()
 {
@@ -169,23 +236,10 @@ void put_job_in_background(job * j,int cont)
 {
 	/* Send the job a continue signal, if necessary.  */
   	if (cont)
-    	if (kill (-j->pgid, SIGCONT) < 0)
+    	if (kill (- j->pgid, SIGCONT) < 0)
       		perror ("kill (SIGCONT)");
 }
-/* Check for processes that have status information available,
-   blocking until all processes in the given job have reported.  */
 
-void wait_for_job (job *j)
-{
-  int status;
-  pid_t pid;
-
-  do
-    pid = waitpid (WAIT_ANY, &status, WUNTRACED);
-  while (!mark_process_status (pid, status)
-         && !job_is_stopped (j)
-         && !job_is_completed (j));
-}
 
 /* Format information about job status for the user to look at.  */
 
