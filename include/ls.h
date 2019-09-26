@@ -13,5 +13,12 @@ void printFileType(struct stat fileStats);
 void printPermissions(struct stat fileStats);
 void printFileNames(char *name,struct stat *fileStats);
 void print_info(DIR * mydir,char * given_directory,struct dirent *myfile,int is_l_mentioned,int is_a_mentioned);
+/*
+Similar to ls command
+@param[in] 		current_path			path of the current directory
+@return 		0 if succesful , -1 on error
+TODO: 
+	- how will the options be handled
+*/
 int m_ls(char* current_path,char ** options,int number_of_args);
 #endif 
