@@ -133,13 +133,16 @@ char * get_kth_command(int k)
 {
 	int count = 1;
 	int rear_temp = rear;
-  if(k == 1 && rear>=0 && rear<QUEUE_SIZE)
-    return arr[rear];
-  else
-  {
-    printf("not enough commands in the history\n");
-    return NULL;
-  }
+    if(k == 1)
+    {
+        if(rear>=0 && rear<QUEUE_SIZE)
+        return arr[rear];
+        else
+        {
+            printf("not enough commands in the history\n");
+            return NULL;
+        }
+    }
 	while(rear_temp != front)
 	{
 		if(count == k && rear_temp>=0 && rear_temp<QUEUE_SIZE)

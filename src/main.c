@@ -7,8 +7,10 @@ void handler()
 {
 	int pid;
 	int status;
-	pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
-	update_job_table(pid, status);
+	do{
+		pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+		update_job_table(pid, status);
+	}while(pid > 0);
 	
 }
 
@@ -26,6 +28,7 @@ int update_job_table(int pid, int status)
 	              	p->status = status;
 	              	if (WIFSTOPPED (status))
 	                {
+	                	j->foreground = false;
 	                	p->stopped = 1;
 	                	if(!j->foreground)
 	                		printf("+ %d suspended \n", pid);
@@ -58,20 +61,6 @@ int update_job_table(int pid, int status)
   	}
 
 }
-/* Check for processes that have status information available,
-   blocking until all processes in the given job have reported.  */
-
-// void wait_for_job (job *j)
-// {
-//   int status;
-//   pid_t pid;
-
-//   do
-//     pid = waitpid (WAIT_ANY, &status, WUNTRACED);
-//   while (!mark_process_status (pid, status)
-//          && !job_is_stopped (j)
-//          && !job_is_completed (j));
-// }
 // call this function after execvp of a foreground process(it runs till child gives SIGCHLD)
 void wait_for_job (job *j)
 {
@@ -88,8 +77,8 @@ void init_shell()
 	clear();
 	shell_terminal = STDIN_FILENO;
 
-	// while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
- //        kill (shell_pgid, SIGTTIN);
+	while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
+        kill (shell_pgid, SIGTTIN);
 
     /* Ignore interactive and job-control signals.  */
     signal (SIGINT, SIG_IGN);
@@ -279,106 +268,6 @@ int job_is_completed (job *j)
     	if (!p->completed)
       	return 0;
   	return 1;
-}
-
-
-
-/* Helper function that forks pipes */
-/*
-This function will be called if there are pipes or 
-redirection in the command given the by the user.
-*/
-int mark_process_status (pid_t pid, int status)
-{
-  	job *j;
-  	command_structure *p;
-
-  	if (pid > 0)
-    {
-      /* Update the record for the process.  */
-      	for (j = first_job; j; j = j->next)
-        	for (p = j->first_command; p; p = p->next)
-          	if (p->pid == pid)
-            {
-              	p->status = status;
-              	if (WIFSTOPPED (status))
-                	p->stopped = 1;
-              	else
-                {
-                  	p->completed = 1;
-                  	if (WIFSIGNALED (status))
-                    	fprintf (stderr, "%d: Terminated by signal %d.\n",(int) pid, WTERMSIG (p->status));
-                }
-              return 0;
-            }
-      	fprintf (stderr, "No child process %d.\n", pid);
-      	return -1;
-    }
-  	else if (pid == 0 || errno == ECHILD)
-    /* No processes ready to report.  */
-    return -1;
-  	else {
-    /* Other weird errors.  */
-    perror ("waitpid");
-    return -1;
-  	}
-}
-
-/* Check for processes that have status information available,
-   without blocking.  */
-
-void update_status (void)
-{
-  	int status;
-  	pid_t pid;
-
-  	do
-    	pid = waitpid (WAIT_ANY, &status, WUNTRACED|WNOHANG);
-  	while (!mark_process_status (pid, status));
-}
-
-
-
-/* Notify the user about stopped or terminated jobs.
-   Delete terminated jobs from the active job list.  */
-
-void do_job_notification (void)
-{
-  job *j, *jlast, *jnext;
-  command_structure *p;
-
-  /* Update status information for child processes.  */
-  update_status ();
-
-  jlast = NULL;
-  for (j = first_job; j; j = jnext)
-    {
-      jnext = j->next;
-
-      /* If all processes have completed, tell the user the job has
-         completed and delete it from the list of active jobs.  */
-      if (job_is_completed (j)) {
-        format_job_info (j, "completed");
-        if (jlast)
-          jlast->next = jnext;
-        else
-          first_job = jnext;
-      // how to implement this function
-        //free_job (j);
-      }
-
-      /* Notify the user about stopped jobs,
-         marking them so that we won’t do this more than once.  */
-      else if (job_is_stopped (j) && !j->notified) {
-        format_job_info (j, "stopped");
-        j->notified = 1;
-        jlast = j;
-      }
-
-      /* Don’t say anything about jobs that are still running.  */
-      else
-        jlast = j;
-    }
 }
 
 void mark_job_as_running (job *j)

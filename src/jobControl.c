@@ -5,7 +5,7 @@
 void show_jobs()
 {
 	// here we need to remove the jobs if they are completed(try this later)
-	
+	remove_completed_jobs();
 	int count = 1;
 	job * temp = first_job;
 	while(temp != NULL)
@@ -82,6 +82,7 @@ void kjob(char ** arguments,int number_of_arguments)
 		{
 			temp = temp->next;
 		}
+		count++;
 	}
 	if(!found_job)
 		printf("No job exist with this job number\n");
@@ -106,16 +107,14 @@ void fg(char ** arguments,int number_of_arguments)
 	int found_job = false;
 	while(temp != NULL)
 	{
-		if(!temp->foreground)
+		count++;
+		if(count == job_number)
 		{
-			count++;
-			if(count == job_number)
-			{
-				// make the job as foreground
-				temp->foreground=1;
-				continue_job(temp,1);
-				break;
-			}
+			// make the job as foreground
+			temp->foreground=1;
+			found_job = true;
+			continue_job(temp,1);
+			break;
 		}
 		temp = temp->next;
 	}
@@ -142,14 +141,17 @@ void bg(char ** arguments,int number_of_arguments)
 	int found_job = false;
 	while(temp != NULL)
 	{
-		if(!temp->foreground)
+		count++;
+		if(count == job_number)
 		{
-			count++;
-			if(count == job_number)
+			found_job = true;
+			command_structure * cmd;
+			for(cmd = temp->first_command;cmd ; cmd= cmd->next)
 			{
-				put_job_in_background(temp,1);
-				break;
+				cmd->stopped = 0;
 			}
+			put_job_in_background(temp,1);
+			break;
 		}
 		temp = temp->next;
 	}
@@ -166,7 +168,7 @@ void overkill()
 	{
 		command_structure *p;
 		for(p=temp->first_command;p;p = p->next)
-			if(kill(temp->pgid,SIGKILL) == -1)
+			if(kill(p->pid,SIGKILL) == -1)
 				perror("error in killing job\n");
 		temp = temp->next;
 	}

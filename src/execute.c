@@ -9,9 +9,11 @@ int spawn_proc (int in, int out, job * j,struct command_structure *cmd) {
 	// case 4 -> cmd arguments >> somefile
 	// case 5 -> cmd < input >> somefile
     pid_t pid;
-    if ((pid = fork ()) == 0) {
+    if ((pid = fork ()) == 0) 
+    {
     	if (j->pgid == -1) j->pgid = pid;
       	setpgid (pid, j->pgid);
+        
         if (in != 0) {
             dup2 (in, 0);
             close (in);
@@ -120,7 +122,6 @@ int spawn_proc (int in, int out, job * j,struct command_structure *cmd) {
     	cmd->pid = pid;
     	if (j->pgid == -1) j->pgid = pid;
       	setpgid (pid, j->pgid);
-      	tcsetpgrp(shell_terminal,j->pgid);
     }
     return pid;
 }

@@ -52,6 +52,12 @@ void cronjob(char ** command, int t ,int p)
 		pid_t pid;
 		if((pid = fork()) == 0)
 		{
+			signal (SIGINT, SIG_DFL);
+	      	signal (SIGQUIT, SIG_DFL);
+	      	signal (SIGTSTP, SIG_DFL);
+	      	signal (SIGTTIN, SIG_DFL);
+	      	signal (SIGTTOU, SIG_DFL);
+	      	signal (SIGCHLD, SIG_DFL);
 			execvp(command[0],command);
 		}
 		else if(pid < 0)
@@ -64,10 +70,6 @@ void cronjob(char ** command, int t ,int p)
 			// parent 
 			int status;
 			pid_t pid_returned = waitpid(pid,&status,0);
-			if(WEXITSTATUS(status))
-				printf("The process with pid - %u exited \n",pid_returned);
-			else if(WIFSIGNALED(status))
-				printf("The process with pid - %u was signalled \n",pid_returned);
 		}
 	}
 }

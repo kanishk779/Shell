@@ -184,7 +184,7 @@ int parse_individual_command(char* command)
 	  				sub_command->output_file = output;
 	  				j++;
 	  			}
-	  			else if(strcmp(words_arr[i],"&") == 0)
+	  			else if(strcmp(words_arr[j],"&") == 0)
 	  			{
 	  				// just skip it
 	  			}
@@ -228,9 +228,7 @@ int parse_individual_command(char* command)
 	  	fork_pipes(pipe_count,new_job);
 		return 0;
 	}	
-	
-	
-	if(is_builtin && builtin_index==12)
+	else if(builtin_index==12)
 	{
 		int idx = 0;
 		char **new_arg_list = (char **)malloc((words-3)*sizeof(char*));
@@ -279,7 +277,7 @@ int parse_individual_command(char* command)
 		new_arg_list[idx]=NULL;
 		cronjob(new_arg_list,t,p);
 	}
-	else if(is_builtin && builtin_index==2)
+	else if(builtin_index==2)
 	{
 		// search for 'e'
 		char c;
@@ -303,98 +301,13 @@ int parse_individual_command(char* command)
 	else
 	{
 		char ** arg_array = fill_argument_array(words);
-		if(is_builtin)
+		if(words>=2 && arg_array[words-2]!=NULL && strcmp(arg_array[words - 2],"&") == 0)
 		{
-			if(words>=2 && arg_array[words-2]!=NULL && strcmp(arg_array[words - 2],"&") == 0)
-			{
-				// this is a back-ground process
-				call_appropriate_function(builtin_index,arg_array,words-2);
-			}
-			else
-				call_appropriate_function(builtin_index,arg_array,words - 1);
+			// this is a back-ground process
+			call_appropriate_function(builtin_index,arg_array,words-2);
 		}
-		// else
-		// {
-		// //  	now we need to do fork and then use execvp
-		// // 	// first find whether the command is foreground or background
-		// // 	int is_background = false;
-		// // 	char **new_arg_list;
-		// // 	if(words>=2 && arg_array[words-2]!=NULL && strcmp(arg_array[words - 2],"&") == 0)
-		// // 	{
-		// // 		is_background = true;
-		// // 		int idx = 0;
-				
-		// // 		new_arg_list = (char **)malloc((words+1)*sizeof(char*));
-		// // 		new_arg_list[idx] = command_option;
-		// // 		idx++;
-		// // 		int arg_array_idx = 0;
-		// // 		for(;idx<=words-2;idx++)
-		// // 		{
-		// // 			new_arg_list[idx] = arg_array[arg_array_idx];
-		// // 			arg_array_idx++;
-		// // 		}
-		// // 		new_arg_list[idx]=NULL;
-		// // 	}
-		// // 	else
-		// // 	{
-		// // 		int idx=0;
-		// // 		new_arg_list = (char **)malloc((words+1)*sizeof(char*));
-		// // 		new_arg_list[idx] = command_option;
-		// // 		idx++;
-		// // 		int arg_array_idx = 0;	
-		// // 		for(;idx<=words;idx++)
-		// // 		{
-		// // 			new_arg_list[idx] = arg_array[arg_array_idx];
-		// // 			arg_array_idx++;
-		// // 		}
-		// // 	}
-		// // 	pid_t pid_returned = fork();
-		// // 	if(pid_returned == -1)
-		// // 	{
-		// // 		perror("fork error\n");
-		// // 		exit(0);
-		// // 	}
-		// // 	if(pid_returned == 0)
-		// // 	{
-		// // 		signal (SIGINT, SIG_DFL);
-		// //       	signal (SIGQUIT, SIG_DFL);
-		// //       	signal (SIGTSTP, SIG_DFL);
-		// //       	signal (SIGTTIN, SIG_DFL);
-		// //       	signal (SIGTTOU, SIG_DFL);
-		// //       	signal (SIGCHLD, SIG_DFL);
-		// // 		pid_t pgrpid = getpgrp();
-		// // 		if((tcsetpgrp(2,pgrpid))<0)
-		// // 		{
-		// // 			perror("error in starting the foreground process\n");
-		// // 		}
-		// // 		if(is_background)
-		// // 			setpgid(0,0);
-		// // 		int status = execvp(new_arg_list[0],new_arg_list);
-		// // 		if(status == -1)
-		// // 		{
-		// // 			perror(strerror(errno));
-		// // 			exit(0);
-		// // 		}
-		// // 	}
-		// // 	else
-		// // 	{
-		// // 		int status;
-		// // 		if(!is_background)
-		// // 		{
-		// // 			int status;
-		// // 			pid_t pd = waitpid(pid_returned,&status,0);
-		// // 			// wait_for_job();
-		// // 			if(WEXITSTATUS(status))
-		// // 				printf("The process with pid - %u exited \n",pid_returned);
-		// // 			else if(WIFSIGNALED(status))
-		// // 				printf("The process with pid - %u was signalled \n",pid_returned);
-		// // 		}
-		// // 		else
-		// // 		{
-		// // 			printf("+ %d suspended \n", pid_returned);
-		// // 		}
-		// // 	}
-		// }
+		else
+			call_appropriate_function(builtin_index,arg_array,words - 1);
 	}
 	return 0;
 }
