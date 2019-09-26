@@ -34,21 +34,28 @@ $ git clone https://github.com/kanishk779/Assignment1_CSE_SHELL
 #go into the directory Assignment1_CSE_SHELL
 $ cd Assignment1_CSE_SHELL
 
-#build the project using make
-$ make
+#build the project using meson build system
+$ meson build
+$ ninja -C build
+
+#go into the directory build
+cd build
 
 #build run the shell 
 $ ./output
 
-#for doing the cleanup
-$ make clean
+#for doing the cleanup first ensure you are in Assignment1_CSE_SHELL directory
+$ cd ..
+
+#remove the directory build
+$ rm -rf build
 ```
 
 ## NOTE
 
 1. The **pinfo** will not work for mac Operating system because the /proc directory does not exist.
 2. Similarly the **nightswatch** command will not work for the mac Operating system.
-3. Till now the i have not added support for handling the pipes.
+
 
 
  
