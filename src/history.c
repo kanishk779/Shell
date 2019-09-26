@@ -32,7 +32,6 @@ void history(int how_many)
 /*
 This queue is implemented to maintain the history of the commands
 */
-    
 void display_Queue(int how_many)
 {
    	if (front == -1) 

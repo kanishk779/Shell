@@ -1,6 +1,5 @@
 #include "utils.h"
 
-// working fine
 char * m_shell_read_line()
 {
 	char *line = NULL;
@@ -11,7 +10,6 @@ char * m_shell_read_line()
 	}
 	return line;
 }
-// it is working
 int count_of_words_in_str(char * str)
 {
 	int len = strlen(str);
@@ -88,7 +86,6 @@ int determine_case(char * command)
 		
 	return 0;
 }
-
 int stringToInt(char * str)
 {
 	int len = strlen(str);

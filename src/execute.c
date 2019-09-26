@@ -28,9 +28,6 @@ int spawn_proc (int in, int out, job * j,struct command_structure *cmd) {
       	signal (SIGTTIN, SIG_DFL);
       	signal (SIGTTOU, SIG_DFL);
       	signal (SIGCHLD, SIG_DFL);
-      
-
-      	
       	// what is to be done here
       	if (j->foreground)
         	tcsetpgrp (shell_terminal, j->pgid);
