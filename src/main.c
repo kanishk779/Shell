@@ -1,6 +1,9 @@
 #include "main.h"
 #include "history.h"
 #include "jobControl.h"
+#include "callBuiltin.h"
+#include "utils.h"
+#include "parser.h"
 
 // this the handler for the SIGHCHLD signal (raised when process is either completed or stopped)
 void handler()
@@ -13,7 +16,7 @@ void handler()
 	}while(pid > 0);
 	
 }
-
+// updates the jobs linked list by updating the status of each job
 int update_job_table(int pid, int status) 
 {
 	job *j;
@@ -46,32 +49,21 @@ int update_job_table(int pid, int status)
 	            }
           	}
       	fprintf (stderr, "No child process %d.\n", pid);
-      	return -1;
     }
   	else if (pid == 0 || errno == ECHILD)
-    {
-    	// there is no process that reported
-    	return -1;
-    }
+    	perror("There is no such process which stopped or completed");
   	else 
-  	{
-	    /* Other weird errors.  */
 	    perror ("waitpid");
-	    return -1;
-  	}
-
+  	return -1;
 }
 // call this function after execvp of a foreground process(it runs till child gives SIGCHLD)
 void wait_for_job (job *j)
 {
   int status;
   pid_t pid;
-
   while (!job_is_stopped (j));
-
-  // now the job is stopped check if it completed or was it stopped(actually no need to check)
-  // the idea is to update the job linked list only when the user gives the command jobs
 }
+// used for initialising the shell
 void init_shell()
 {
 	clear();
@@ -118,24 +110,25 @@ void init_shell()
 		perror("could get username\n");
 		exit(1);
 	}
-	builtins[0] = "ls"; // working(with error handling)
-	builtins[1] = "cd"; // working(with error handling)
-	builtins[2] = "echo"; // working
-	builtins[3] = "quit"; // working
-	builtins[4] = "history"; //working
-	builtins[5] = "help"; // working
-	builtins[6] = "clear";	// working
-	builtins[7] = "pinfo";  //working
-	builtins[8] = "nightswatch"; // working
-	builtins[9] = "pwd"; // working
-	builtins[10]= "setenv"; // working
-	builtins[11]= "unsetenv"; // working
-	builtins[12]= "cronjob"; // working
-	builtins[13]= "overkill"; // does nothing
+	// list of builtins
+	builtins[0] = "ls"; 
+	builtins[1] = "cd"; 
+	builtins[2] = "echo"; 
+	builtins[3] = "quit"; 
+	builtins[4] = "history"; 
+	builtins[5] = "help"; 
+	builtins[6] = "clear";	
+	builtins[7] = "pinfo";  
+	builtins[8] = "nightswatch"; 
+	builtins[9] = "pwd"; 
+	builtins[10]= "setenv"; 
+	builtins[11]= "unsetenv"; 
+	builtins[12]= "cronjob"; 
+	builtins[13]= "overkill"; 
 	builtins[14]= "kjob";
-	builtins[15]= "bg";  // not working
-	builtins[16]= "fg";  // not working
-	builtins[17]= "jobs"; // working correctly
+	builtins[15]= "bg";  
+	builtins[16]= "fg";  
+	builtins[17]= "jobs"; 
 
 	printf("------------------------This is shell inside shell ----------------\n");
 }
@@ -158,6 +151,7 @@ int main()
 	}
 	return 0;
 }
+// show the prompt for the shell
 void show_user_sys_name()
 {
 	char * current_directory;
@@ -174,6 +168,7 @@ void show_user_sys_name()
 	}
 	free(current_directory);
 }
+// initialises the job and returns it
 job * init_job()
 {
 	job * new_job = (job *)malloc(sizeof(job));
@@ -185,6 +180,7 @@ job * init_job()
 	new_job->job_name = NULL;
 	return new_job;
 }
+// initialises the command_structure and returns it
 command_structure * init_command_structure()
 {
 	command_structure * command = (command_structure *)malloc(sizeof(command_structure));
@@ -229,23 +225,10 @@ void put_job_in_background(job * j,int cont)
       		perror ("kill (SIGCONT)");
 }
 
-
 /* Format information about job status for the user to look at.  */
-
 void format_job_info (job *j, const char *status)
 {
-  fprintf (stderr, "%ld (%s): %s\n", (long)j->pgid, status, j->command);
-}
-
-
-job *find_job (pid_t pgid)
-{
-  	job *j;
-
-  	for (j = first_job; j; j = j->next)
-    if (j->pgid == pgid)
-      	return j;
-  	return NULL;
+  	fprintf (stderr, "%ld (%s): %s\n", (long)j->pgid, status, j->command);
 }
 
 /* Return true if all processes in the job have stopped or completed.  */
@@ -269,18 +252,17 @@ int job_is_completed (job *j)
       	return 0;
   	return 1;
 }
-
+// marks the job j as running again
 void mark_job_as_running (job *j)
 {
-  command_structure *p;
+	command_structure *p;
 
-  for (p = j->first_command; p; p = p->next)
-    p->stopped = 0;
-  j->notified = 0;
+	for (p = j->first_command; p; p = p->next)
+	    p->stopped = 0;
+	j->notified = 0;
 }
 
 /* Continue the job J.  */
-
 void continue_job (job *j, int foreground)
 {
   mark_job_as_running (j);

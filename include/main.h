@@ -43,40 +43,27 @@ typedef struct job
 	char * job_name;				/* name of the job */
 } job;
 job * first_job;
+
+/*
+Handles the SIGCHLD signal
+*/
+void handler();
+
+/*
+updates the job linked list
+*/
+int update_job_table(int pid, int status);
+
+/*
+waits for the foreground job to finish
+*/
+void wait_for_job (job *j);
+
 /*
 This function displays the initial information to the user,
 when starting the shell. It also initialises the variables.
 */
 void init_shell();
-
-/*
-gives the relative path in-case the current directory is inside
-the the home-directory(where this project resides).
-gives absolute path in-case the current directory is the ancestor
-of the home-directory.
-@param[in]		curr_dir	current directory in shell
-@param[in]		home_dir 	home directory determined in the
-							beginning of the program.
-@return 		the absolute or relative path.
-*/ 
-char * give_relative_or_absolute_path(char * curr_dir,char* home_dir);
-/*
-Parse the semi-colon separated list of commands
-@param[in] 		commands 	pointer to command which this method parses
-@return 		a string of command and its options. (don't know will use it)
-*/
-void parse_commands(char* commands);
-
-/*
-Parse the individual command sent by the parse_commands function
-@param[in]		command 	pointer to command which this method parses
-@return 		status of the execution of the command 0->successful 1->failure
-*/
-int parse_individual_command(char* command);
-
-/*
-*/
-char ** fill_argument_array(int words);
 
 /*
 Shows the <username@system_name:curr_dir> prompt to the user 
@@ -85,64 +72,29 @@ after executing every command.
 void show_user_sys_name();
 
 /*
-Calls the appropriate builtin function passing it the options and arguments
-@param[in]		builtin_index 	index of the builtin command to run
-@param[in]		options_array	contains the options and arguments for the commands
-@param[in]		number_of_args	number of args present in the options array
-*/
-void call_appropriate_function(int builtin_index,char ** options_array,int number_of_args);
-
-/*
-Free all the heap allocated memory so that no memory leaks take 
-place once the program is over.
-*/
-void m_free();
-
-/*
-This function displays the various builtin command that this
-shell supports.
-@param[in]		file 		the file pointer to which the information
-							is to be displayed.
-*/
-void m_help(FILE * file);
-
-/*
-reads a line of command from the terminal
-*/
-char * m_shell_read_line();
-
-/*
 initialises the empty job 
 @return 		The empty job
 */
 job* init_job();
-
-
 
 /*
 initialises an empty command_structure
 */
 command_structure * init_command_structure();
 
-/*
-finds the job with mentioned pgid
-*/
-job *find_job (pid_t pgid);
-
-
-int update_job_table(int pid, int status) ;
-int job_is_stopped (job *j);
-int job_is_completed (job *j);
 void put_job_in_foreground(job * j,int cont);
-void wait_for_job (job *j);
-void format_job_info (job *j, const char *status);
-int mark_process_status (pid_t pid, int status);
-void update_status (void);
-int run_command(char * command);
-void do_job_notification (void);
-void mark_job_as_running (job *j);
-void continue_job (job *j, int foreground);
+
 void put_job_in_background(job * j,int cont);
+
+int job_is_stopped (job *j);
+
+int job_is_completed (job *j);
+
+void format_job_info (job *j, const char *status);
+
+void mark_job_as_running (job *j);
+
+void continue_job (job *j, int foreground);
 
 #endif
 

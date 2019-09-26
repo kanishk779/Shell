@@ -3,11 +3,13 @@
 #include "utils.h"
 #include "main.h"
 #include "builtin.h"
+#include "callBuiltin.h"
 #include "history.h"
 #include "execute.h"
+#include "absolutePath.h"
 /*
 strtok() will remember which string it operated on last time even if a function 
-call happen.
+call happens and helps in filling the arguments array.
 */
 char ** fill_argument_array(int words)
 {
@@ -60,6 +62,7 @@ int parse_up_command(char* command)
 	char * kth_command = get_kth_command(up_count);
 	if(kth_command == NULL)
 		return 1;
+	// Again call the individual command to run
 	parse_individual_command(kth_command);
 	return 1;
 }
@@ -96,17 +99,18 @@ int parse_individual_command(char* command)
 	// The function will only work if up command is given
 	if(parse_up_command(command))
 		return 0;
-	//
+
 	int pipe_count = give_count_of_pipes(command);
 	int redirection_present = determine_case(command);
-	// here check if it not a builtin command
-	
 	int words = count_of_words_in_str(command);
+
+	// allocate space for builtin helper(which checks if command is builtin)
 	char * builtin_helper = (char *)malloc(512);
 	strcpy(builtin_helper , command);
 	char * echo_helper = (char *) malloc(512);
 	strcpy(echo_helper,command);
 	char * command_option = strtok(builtin_helper,MAIN_TOK_DELIM);
+	
 	// first check if it is a builtin or not
 	int is_builtin = false;
 	int builtin_index=-1;
@@ -302,10 +306,7 @@ int parse_individual_command(char* command)
 	{
 		char ** arg_array = fill_argument_array(words);
 		if(words>=2 && arg_array[words-2]!=NULL && strcmp(arg_array[words - 2],"&") == 0)
-		{
-			// this is a back-ground process
 			call_appropriate_function(builtin_index,arg_array,words-2);
-		}
 		else
 			call_appropriate_function(builtin_index,arg_array,words - 1);
 	}

@@ -135,7 +135,6 @@ void bg(char ** arguments,int number_of_arguments)
 		return;
 	}
 	int job_number = stringToInt(arguments[0]);
-	//do_job_notification();
 	int count = 0;
 	job * temp = first_job;
 	int found_job = false;
@@ -162,7 +161,7 @@ void bg(char ** arguments,int number_of_arguments)
 // kill all the background processes
 void overkill()
 {
-	// send signals to all the jobs in the stopped or running in the background
+	// send signals to all the jobs stopped or running in the background
 	job * temp = first_job;
 	while(temp)
 	{
